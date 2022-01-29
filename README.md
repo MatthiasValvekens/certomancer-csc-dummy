@@ -65,6 +65,13 @@ Again, note that all credentials are always available without any form of authen
 although the caller is still required to go through the motions of requesting a SAD token
 before any signatures will be returned.
 
+**Note:** The CSC dummy server currently does _not_ launch Certomancer Animator or otherwise
+expose access to trust services managed by Certomancer. For now, you need to launch
+Certomancer Animator in a separate process if you need those.
+
+(The reason is that Certomancer doesn't (yet) natively integrate with `aiohttp`, it
+currently only does WSGI. That may change in the future.)
+
 ## Example usage
 
 See here:
