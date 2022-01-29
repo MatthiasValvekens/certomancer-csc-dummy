@@ -38,6 +38,13 @@ it might be useful for others to play around with, and the primitive CLI reflect
 
 ## Invocation
 
+The package is on [PyPI](https://pypi.org/project/certomancer-csc-dummy/0.1.0/)
+and can be installed via `pip`:
+
+```bash
+pip install certomancer-csc-dummy
+```
+
 This is the command syntax. All parameters are required.
 
 ```bash
