@@ -23,12 +23,9 @@ derivative thereof, with production keys.**
 
 ## Missing features
 
-Besides most authentication-related endpoints, the following CSC features are also missing:
-
- - `signatures/timestamp`
- - `credentials/extendTransaction`
-
-These may be implemented in the future.
+Besides most authentication-related endpoints, the
+`credentials/extendTransaction` endpoint is currently also unavailable. Support
+for this endpoint may be implemented in the future.
 
 The other obvious missing feature is "anything resembling a decent user interface".
 This code was essentially isolated from
