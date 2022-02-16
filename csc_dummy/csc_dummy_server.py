@@ -21,13 +21,14 @@ from typing import List, Optional
 
 import python_pae
 from aiohttp import web
-from asn1crypto import algos, keys
+from asn1crypto import algos, cms, keys, tsp
 from certomancer import registry
 from certomancer.config_utils import ConfigurationError
 from certomancer.registry import (
     ArchLabel,
     CertLabel,
     CertomancerObjectNotFoundError,
+    ServiceLabel,
 )
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, hmac
@@ -75,6 +76,7 @@ class DummyServiceParams:
     hash_pinning_required: bool = True
     multisign: int = 10
     sad_secret: bytes = b'secret'
+    default_tsa: Optional[str] = None
 
 
 _CSC_AUTH_HASHES_LIST_PAE_TYPE = PAEHomogeneousList(
@@ -208,6 +210,23 @@ def b64_der(obj) -> str:
     return base64.b64encode(obj.dump()).decode('ascii')
 
 
+def _tsa_req(message_digest, md_algorithm, nonce=None):
+    req = {
+        'version': 1,
+        'message_imprint': tsp.MessageImprint({
+            'hash_algorithm': algos.DigestAlgorithm({
+                'algorithm': md_algorithm
+            }),
+            'hashed_message': message_digest
+        }),
+        # we want the server to send along its certs
+        'cert_req': True
+    }
+    if nonce is not None:
+        req['nonce'] = cms.Integer(nonce)
+    return tsp.TimeStampReq(req)
+
+
 # noinspection PyUnusedLocal
 class CSCWithCertomancer:
 
@@ -229,6 +248,7 @@ class CSCWithCertomancer:
             web.post('/csc/v1/credentials/authorize', self.credentials_authorize),
             # we don't do extendTransaction and sendOTP
             web.post('/csc/v1/signatures/signHash', self.signatures_sign_hash),
+            web.post('/csc/v1/signatures/timestamp', self.signatures_timestamp),
             # TODO implement /signatures/timestamp
         ])
 
@@ -379,6 +399,46 @@ class CSCWithCertomancer:
         )
         sad = auth_obj.derive_sad(self.service_params.sad_secret)
         return web.json_response({'SAD': sad})
+
+    async def signatures_timestamp(self, request: web.Request):
+        # Note: we select the TSA service based on the clientData
+        # present. If there's no clientData, we use the default.
+        # If there's no default, we bail.
+        params = await request.json()
+        tsa_id = params.get('clientData', self.service_params.default_tsa)
+        if tsa_id is None:
+            raise web.HTTPConflict()
+        splits = tsa_id.split(sep='/', maxsplit=1)
+        arch_label = ArchLabel(splits[0])
+        svc_label = ServiceLabel(splits[1])
+
+        config = self.certomancer_config
+        try:
+            pki_arch = config.get_pki_arch(arch_label)
+            tsa_service = pki_arch.service_registry\
+                .summon_timestamper(label=svc_label)
+        except CertomancerObjectNotFoundError:
+            raise web.HTTPNotFound()
+
+        try:
+            digest = base64.b64decode(params['hash'])
+            md_algo_id = algos.DigestAlgorithmId(params['hashAlgo'])
+        except (KeyError, ValueError, TypeError):
+            raise web.HTTPBadRequest()
+
+        try:
+            nonce = int(params['nonce'], 16)
+        except KeyError:
+            nonce = None
+        except (ValueError, TypeError):
+            raise web.HTTPBadRequest()
+
+        tsa_req: tsp.TimeStampReq = _tsa_req(digest, md_algo_id, nonce)
+        tsa_resp: tsp.TimeStampResp = tsa_service.request_tsa_response(tsa_req)
+        tst: cms.ContentInfo = tsa_resp['time_stamp_token']
+        tst_b64 = base64.b64encode(tst.dump()).decode('ascii')
+
+        return web.json_response({'timestamp': tst_b64})
 
     async def signatures_sign_hash(self, request: web.Request):
         params = await request.json()
