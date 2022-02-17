@@ -15,6 +15,7 @@ derivative thereof, with production keys.
 """
 
 import base64
+import logging
 from dataclasses import dataclass, field
 from io import BytesIO
 from typing import List, Optional
@@ -42,6 +43,8 @@ from python_pae.pae_types import (
     PAEHomogeneousList,
     PAEString,
 )
+
+logger = logging.getLogger(__name__)
 
 # FIXME machine-readable error messages
 
@@ -180,6 +183,7 @@ class CSCAuthorization:
                 )
             )
         except ValueError:
+            logger.error("SAD processing error", exc_info=True)
             raise web.HTTPBadRequest()
         # validate the MAC first, before trying to process the auth data
         # noinspection PyTypeChecker
@@ -188,11 +192,13 @@ class CSCAuthorization:
         try:
             h.verify(mac_token)
         except InvalidSignature:
+            logger.error("Invalid SAD MAC", exc_info=True)
             raise web.HTTPBadRequest()
         try:
             auth_data_obj = \
                 _csc_auth_pae_parse(embedded_auth_data, credential_id)
         except ValueError:
+            logger.error("Failed to parse SAD", exc_info=True)
             raise web.HTTPBadRequest()
         return auth_data_obj
 
@@ -333,6 +339,7 @@ class CSCWithCertomancer:
         try:
             cred_id = str(params['credentialID'])
         except KeyError:
+            logger.error("No credentialID")
             raise web.HTTPBadRequest()
 
         pki_arch, cert_spec = self._parse_credential_id(cred_id)
@@ -355,6 +362,7 @@ class CSCWithCertomancer:
 
         certificates_req = params.get('certificates', 'single')
         if certificates_req not in ('none', 'chain', 'single'):
+            logger.error("Invalid certificates_req")
             raise web.HTTPBadRequest()
         response = {'key': key_info}
         if certificates_req != 'none':
@@ -378,18 +386,27 @@ class CSCWithCertomancer:
             cred_id = str(params['credentialID'])
             num_signatures = int(params['numSignatures'])
         except (KeyError, ValueError):
+            logger.error(
+                "Could not parse credentialID and/or numSignatures",
+                exc_info=True
+            )
             raise web.HTTPBadRequest()
 
         pki_arch, cert_spec = self._parse_credential_id(cred_id)
         if not pki_arch.is_subject_key_available(cert_spec.label):
+            logger.error("No private key for subject " + str(cert_spec.label))
             raise web.HTTPBadRequest()
 
         hashes_list = params.get('hash', None)
         if hashes_list is None:
             if self.service_params.hash_pinning_required:
+                logger.error(
+                    "Hash pinning is required; no hashes were provided"
+                )
                 raise web.HTTPBadRequest()
         else:
             if len(hashes_list) != num_signatures:
+                logger.error("Hash list and signature count do not match")
                 raise web.HTTPBadRequest()
             hashes_list = [base64.b64decode(x) for x in hashes_list]
 
@@ -424,6 +441,10 @@ class CSCWithCertomancer:
             digest = base64.b64decode(params['hash'])
             md_algo_id = algos.DigestAlgorithmId(params['hashAlgo'])
         except (KeyError, ValueError, TypeError):
+            logger.error(
+                "Failed to decode digest and/or parse algorithm ID",
+                exc_info=True
+            )
             raise web.HTTPBadRequest()
 
         try:
@@ -431,6 +452,10 @@ class CSCWithCertomancer:
         except KeyError:
             nonce = None
         except (ValueError, TypeError):
+            logger.error(
+                "Failed to decode digest and/or parse algorithm ID",
+                exc_info=True
+            )
             raise web.HTTPBadRequest()
 
         tsa_req: tsp.TimeStampReq = _tsa_req(digest, md_algo_id, nonce)
@@ -446,6 +471,9 @@ class CSCWithCertomancer:
             cred_id = str(params['credentialID'])
             sad = params['SAD']
         except KeyError:
+            logger.error(
+                "Failed to process credentialID and/or SAD", exc_info=True
+            )
             raise web.HTTPBadRequest()
 
         csc_auth_obj = CSCAuthorization.verify_sad(
@@ -457,20 +485,27 @@ class CSCWithCertomancer:
             priv_key_info = pki_arch.key_set.get_private_key(
                 cert_spec.subject_key
             )
-        except ConfigurationError as e:
+        except ConfigurationError:
+            logger.error("Failed to obtain private key data", exc_info=True)
             raise web.HTTPBadRequest()
 
         try:
             hash_list = [base64.b64decode(x) for x in params['hash']]
             sign_algo_id = algos.SignedDigestAlgorithmId(params['signAlgo'])
         except (KeyError, ValueError):
+            logger.error(
+                "Failed to process hash list and/or signature algorithm ID",
+                exc_info=True
+            )
             raise web.HTTPBadRequest()
 
         if csc_auth_obj.hashes is not None:
             if not set(hash_list).issubset(csc_auth_obj.hashes):
+                logger.error("Unexpected hashes in signing request")
                 raise web.HTTPBadRequest()
         else:
             if not len(hash_list) <= csc_auth_obj.num_signatures:
+                logger.error("Too many hashes in signing request")
                 raise web.HTTPBadRequest()
 
         sign_algo_params = params.get('signAlgoParams', None)
@@ -489,6 +524,7 @@ class CSCWithCertomancer:
                 'parameters': sign_algo_params
             })
         except ValueError:
+            logger.error("Failed to construct signed digest algorithm")
             raise web.HTTPBadRequest()
 
         hash_algo_oid = params.get('hashAlgo', None)
@@ -496,6 +532,7 @@ class CSCWithCertomancer:
             hash_algo = sign_algo.hash_algo
         except ValueError:
             if hash_algo_oid is None:
+                logger.error("No default hash algorithm", exc_info=True)
                 raise web.HTTPBadRequest()
             hash_algo = algos.DigestAlgorithmId(hash_algo_oid).native
 
