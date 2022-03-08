@@ -1,6 +1,6 @@
-asn1crypto>=1.4.0
+asn1crypto>=1.5.0
 cryptography>=3.3.1
-certomancer~=0.8.1
+certomancer~=0.8.2
 aiohttp~=3.8.0
 pytest-aiohttp~=0.3.0
 python-pae==0.1.0
