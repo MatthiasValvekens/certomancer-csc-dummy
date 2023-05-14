@@ -30,7 +30,7 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 2 - Alpha',
 
         'Intended Audience :: Developers',
 
@@ -41,6 +41,7 @@ setup(
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
 
         'Topic :: Security :: Cryptography',
         'Topic :: Software Development :: Libraries :: Python Modules',
@@ -53,7 +54,7 @@ setup(
     install_requires=[
         'asn1crypto>=1.5.0',
         'cryptography>=3.3.1',
-        'certomancer >=0.8.3, <0.10.0',
+        'certomancer >=0.11.0, <0.12.0',
         'aiohttp~=3.8.0',
         'python-pae==0.1.0',
     ],
