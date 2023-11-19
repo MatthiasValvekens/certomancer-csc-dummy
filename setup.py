@@ -55,7 +55,7 @@ setup(
         'asn1crypto>=1.5.0',
         'cryptography>=3.3.1',
         'certomancer >=0.11.0, <0.12.0',
-        'aiohttp~=3.8.0',
+        'aiohttp~=3.9.0',
         'python-pae==0.1.0',
     ],
     setup_requires=['wheel',],
