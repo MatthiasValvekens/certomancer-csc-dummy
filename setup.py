@@ -37,12 +37,11 @@ setup(
         'License :: OSI Approved :: MIT License',
 
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
         'Programming Language :: Python :: 3.12',
+        'Programming Language :: Python :: 3.13',
 
         'Topic :: Security :: Cryptography',
         'Topic :: Software Development :: Libraries :: Python Modules',
@@ -55,7 +54,7 @@ setup(
     install_requires=[
         'asn1crypto>=1.5.0',
         'cryptography>=3.3.1',
-        'certomancer >=0.12.0, <0.13.0',
+        'certomancer >=0.13.0',
         'aiohttp~=3.9.0',
         'python-pae==0.1.0',
     ],
